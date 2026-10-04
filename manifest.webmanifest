@@ -1,0 +1,9 @@
+{
+  "name": "Gymnastik-Intervall",
+  "short_name": "Gymnastik",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#101a17",
+  "theme_color": "#14251f",
+  "icons": [{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}

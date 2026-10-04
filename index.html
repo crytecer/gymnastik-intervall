@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14251f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>Gymnastik Intervall</title>
+<style>
+:root{color-scheme:dark;--bg:#101a17;--panel:#1a2923;--green:#b7efc5;--muted:#a9b8b0;--line:#34483e}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#1a3027,#101a17 60%);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#f4faf6;min-height:100vh}
+main{max-width:520px;margin:auto;padding:calc(22px + env(safe-area-inset-top)) 20px calc(28px + env(safe-area-inset-bottom))}
+h1{font-size:28px;margin:8px 0 5px}.sub{color:var(--muted);margin:0 0 24px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:20px;margin:14px 0}
+.settings{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+label{display:block;color:var(--muted);font-size:14px;margin-bottom:7px}
+input{width:100%;background:#0f1b16;border:1px solid #40564a;border-radius:12px;padding:14px;color:white;font-size:20px}
+.unit{font-size:12px;color:var(--muted);margin-top:5px}
+.phase{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--green);font-weight:700}
+.time{font-size:clamp(76px,20vw,112px);font-weight:750;letter-spacing:-.06em;text-align:center;line-height:1.15;margin:12px 0}
+.hint{text-align:center;color:var(--muted);min-height:24px}
+.progress{height:8px;background:#0c1511;border-radius:20px;overflow:hidden;margin-top:22px}.bar{height:100%;width:0;background:var(--green);transition:width .15s linear}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+button{border:0;border-radius:14px;padding:16px;font-size:17px;font-weight:700}
+.primary{background:var(--green);color:#102018}.secondary{background:#304238;color:white}
+button:disabled{opacity:.4}
+.note{font-size:12px;color:var(--muted);line-height:1.5;text-align:center;margin-top:20px}
+</style>
+</head>
+<body><main>
+<h1>Gymnastik-Intervall</h1><p class="sub">Übung · Gong · Wechselpause · Wiederholen</p>
+<section class="panel">
+<div class="settings">
+<div><label for="exercise">Übungszeit</label><input id="exercise" type="number" min="1" max="3600" value="30"><div class="unit">Sekunden</div></div>
+<div><label for="rest">Wechselzeit</label><input id="rest" type="number" min="0" max="600" value="5"><div class="unit">Sekunden</div></div>
+</div>
+</section>
+<section class="panel">
+<div class="phase" id="phase">Bereit</div>
+<div class="time" id="time">00:30</div>
+<div class="hint" id="hint">Starte dein Training, wenn du bereit bist.</div>
+<div class="progress"><div class="bar" id="bar"></div></div>
+<div class="actions">
+<button class="primary" id="start">Start</button>
+<button class="secondary" id="reset">Zurücksetzen</button>
+</div>
+</section>
+<p class="note">Der Gong wird direkt auf diesem iPhone erzeugt. Lass die Seite während des Trainings geöffnet und stelle den Klingelton-/Medienpegel passend ein.</p>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let phase="exercise",remaining=30,total=30,running=false,interval=null,ctx=null;
+function valid(v,min,max){const n=Number(v);return Number.isFinite(n)?Math.min(max,Math.max(min,Math.round(n))):min}
+function settings(){return {ex:valid($("exercise").value,1,3600),rest:valid($("rest").value,0,600)}}
+function fmt(s){return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
+function render(){
+ $("phase").textContent=phase==="exercise"?"Übungszeit":phase==="rest"?"Übung wechseln":"Bereit";
+ $("time").textContent=fmt(remaining);
+ $("hint").textContent=phase==="rest"?"Wechsel zur nächsten Übung.":phase==="exercise"?(running?"Weiter so!":"Starte dein Training, wenn du bereit bist."):"Starte dein Training, wenn du bereit bist.";
+ $("bar").style.width=(total?100*(total-remaining)/total:0)+"%";
+ $("start").textContent=running?"Pause":(remaining===total?"Start":"Weiter");
+ $("exercise").disabled=$("rest").disabled=running;
+}
+function gong(){
+ try{
+  ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();
+  if(ctx.state==="suspended")ctx.resume();
+  const osc=ctx.createOscillator(),gain=ctx.createGain();
+  osc.type="sine";osc.frequency.setValueAtTime(880,ctx.currentTime);
+  gain.gain.setValueAtTime(.0001,ctx.currentTime);gain.gain.exponentialRampToValueAtTime(.35,ctx.currentTime+.025);gain.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+.8);
+  osc.connect(gain);gain.connect(ctx.destination);osc.start();osc.stop(ctx.currentTime+.82);
+ }catch(e){}
+}
+function beginPhase(p){
+ phase=p;const s=settings();total=p==="exercise"?s.ex:s.rest;remaining=total;
+ if(p==="rest"||p==="exercise")gong();
+}
+function tick(){
+ if(remaining>0)remaining--;
+ if(remaining<=0){
+  if(phase==="exercise"){
+   const r=settings().rest;
+   if(r>0)beginPhase("rest");else beginPhase("exercise");
+  }else beginPhase("exercise");
+ }
+ render();
+}
+function start(){
+ if(running){clearInterval(interval);interval=null;running=false;render();return}
+ if(phase==="ready"){phase="exercise";total=settings().ex;remaining=total;}
+ running=true;interval=setInterval(tick,1000);render();
+}
+function reset(){
+ clearInterval(interval);interval=null;running=false;phase="ready";total=settings().ex;remaining=total;render();
+}
+$("start").addEventListener("click",start);$("reset").addEventListener("click",reset);
+["exercise","rest"].forEach(id=>$(id).addEventListener("change",()=>{if(!running){reset()}}));
+document.addEventListener("visibilitychange",()=>{if(document.hidden&&running){/* interval continues; keep page open for best audio reliability */}});
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+reset();
+</script>
+</body></html>
